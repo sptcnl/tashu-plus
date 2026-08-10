@@ -1,0 +1,69 @@
+# 타슈+ 데모 스택: postgres + backend(FastAPI) + frontend(빌드 후 nginx serve)
+#
+# 사용 이미지는 모두 linux/arm64 멀티아치를 지원해서 라즈베리파이(ARM64)에서도
+# 그대로 `docker compose up --build` 가 동작한다.
+#   - postgres:16-alpine
+#   - python:3.12-slim
+#   - node:22-alpine / nginx:1.27-alpine
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tashu-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tashu
+      POSTGRES_PASSWORD: tashu
+      POSTGRES_DB: tashu
+      # 한글 데이터 정렬/인코딩
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tashu -d tashu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 호스트에서 직접 붙어볼 때만 필요하면 주석을 해제한다.
+    # ports:
+    #   - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+    container_name: tashu-backend
+    restart: unless-stopped
+    environment:
+      # SQLite 대신 PostgreSQL 16 을 쓰도록 교체하는 지점.
+      DATABASE_URL: postgresql+psycopg://tashu:tashu@db:5432/tashu
+      # 외부 API 키는 호스트 환경변수(또는 .env)에서 주입한다.
+      # 비어 있으면 seed/mock 으로 폴백하므로 키 없이도 데모가 돌아간다.
+      TASHU_API_KEY: ${TASHU_API_KEY:-}
+      KAKAO_REST_KEY: ${KAKAO_REST_KEY:-}
+      TASHU_CACHE_TTL_SECONDS: ${TASHU_CACHE_TTL_SECONDS:-60}
+      DANGER_RADIUS_M: ${DANGER_RADIUS_M:-200}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # 빈 값이면 same-origin(/api)으로 요청하고, nginx 가 backend 로 프록시한다.
+        VITE_API_URL: ""
+        # 카카오 JS 키는 빌드 타임에 번들에 박힌다. 비어 있으면 CSS 폴백 지도가 뜬다.
+        # ★ developers.kakao.com 플랫폼 설정에 http://localhost (배포 시 배포 도메인) 등록 필요
+        VITE_KAKAO_JS_KEY: ${VITE_KAKAO_JS_KEY:-}
+    container_name: tashu-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "80:80"
+
+volumes:
+  db-data:

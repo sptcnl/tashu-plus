@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.db
+
+# Node
+node_modules/
+dist/
+.vite/
+
+# 환경변수
+.env
+.env.local
+
+# 에디터 / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code 로컬 설정 (머신별 권한 설정이라 공유하지 않음)
+.claude/settings.local.json
+
+# TypeScript 증분 빌드 정보
+*.tsbuildinfo

@@ -1,0 +1,8 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+SQLAlchemy==2.0.36
+pydantic==2.10.4
+# 타슈 공공 API / 카카오 REST API 비동기 호출용
+httpx==0.28.1
+# PostgreSQL 드라이버 (docker-compose 에서 DATABASE_URL 을 postgresql+psycopg 로 바꿀 때 사용)
+psycopg[binary]==3.2.3

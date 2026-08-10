@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    @apply bg-[#E7E4DE];
+  }
+
+  body {
+    @apply font-sans text-navy antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* 모바일 프레임 안에서 가로 스크롤 영역의 스크롤바를 숨긴다 */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card bg-white shadow-card;
+  }
+
+  .chip {
+    @apply shrink-0 rounded-chip border border-black/5 bg-white px-3 py-1.5 text-[13px] font-medium text-navy/70 transition-colors;
+  }
+
+  .chip-active {
+    @apply border-transparent bg-brand text-white;
+  }
+
+  .cta {
+    @apply flex h-12 w-full items-center justify-center rounded-xl bg-orange text-[15px] font-bold text-white transition-opacity active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40;
+  }
+
+  .section-label {
+    @apply mb-2.5 text-[13px] font-bold text-navy/50;
+  }
+
+  .row {
+    @apply flex h-12 w-full items-center justify-between rounded-xl bg-white px-4 text-[14px] shadow-card;
+  }
+}
