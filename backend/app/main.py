@@ -12,6 +12,7 @@
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -40,6 +41,12 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
     "http://localhost:4173",  # vite preview
     "http://localhost",  # docker-compose 의 nginx
+]
+
+# 배포 환경의 프론트 주소는 CORS_ORIGINS 환경변수(콤마 구분)로 추가한다.
+# 예) CORS_ORIGINS=https://tashu-plus.vercel.app,https://tashu-plus.netlify.app
+ALLOWED_ORIGINS += [
+    origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()
 ]
 
 
