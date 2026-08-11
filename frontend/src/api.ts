@@ -2,6 +2,8 @@
 
 import type {
   Activity,
+  AmenityKind,
+  AmenityList,
   Board,
   Geocode,
   LatLng,
@@ -74,6 +76,10 @@ export const api = {
         radius: String(radius),
       })}`,
     ),
+
+  // 편의시설 위치 핀 (화장실/음수대/바람주입/맛집)
+  amenities: (kind?: AmenityKind) =>
+    get<AmenityList>(kind ? `/amenities?kind=${encodeURIComponent(kind)}` : '/amenities'),
 
   // 장소명 → 좌표 (경로 화면 입력용)
   geocode: (query: string) =>

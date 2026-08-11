@@ -313,3 +313,59 @@ async def search_keyword(query: str) -> dict | None:
         }
     except (KeyError, TypeError, ValueError):
         return None
+
+
+async def search_places(
+    query: str,
+    *,
+    lat: float,
+    lng: float,
+    radius: int = 20000,
+    size: int = 15,
+) -> list[dict] | None:
+    """키워드로 특정 좌표 주변 장소 '여러 곳' 을 좌표와 함께 찾는다 (편의시설 핀 용도).
+
+    - x=경도(lng), y=위도(lat), radius(m) 안에서 가까운 순으로.
+    - 키가 없거나 호출이 실패하면 None (호출자가 seed 로 폴백).
+    - 결과가 0건이면 빈 리스트를 돌려준다 (호출은 성공했으나 해당 종류가 없는 것).
+    """
+    payload = await _get(
+        KEYWORD_PATH,
+        {
+            "query": query,
+            "x": str(lng),
+            "y": str(lat),
+            "radius": max(0, min(radius, 20000)),
+            "size": max(1, min(size, 15)),
+            "sort": "distance",
+        },
+    )
+    if not payload:
+        return None
+    documents = payload.get("documents")
+    if not isinstance(documents, list):
+        return None
+
+    places: list[dict] = []
+    for doc in documents:
+        if not isinstance(doc, dict):
+            continue
+        try:
+            name = str(doc.get("place_name") or "").strip()
+            lat_v = float(doc["y"])
+            lng_v = float(doc["x"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not name:
+            continue
+        places.append(
+            {
+                "name": name,
+                "address": str(
+                    doc.get("road_address_name") or doc.get("address_name") or ""
+                ).strip(),
+                "lat": lat_v,
+                "lng": lng_v,
+            }
+        )
+    return places

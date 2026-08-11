@@ -1,3 +1,4 @@
+export type AmenityKind = '화장실' | '음수대' | '바람주입' | '맛집'
 export type ReportCategory = '공사구간' | '불법주정차' | '도로파손' | '조명없음'
 export type ReportStatus = '접수' | '처리중' | '완료'
 export type MissionStatus = '대기' | '진행중' | '완료'
@@ -44,6 +45,21 @@ export interface NearbyList {
   source: DataSource
   count: number
   stations: NearbyStation[]
+}
+
+/** 대여소와 별개로 자체 좌표를 가진 편의시설 (지도의 독립 핀) */
+export interface Amenity {
+  id: number
+  kind: AmenityKind
+  name: string
+  lat: number
+  lng: number
+  description: string | null
+}
+
+export interface AmenityList {
+  count: number
+  amenities: Amenity[]
 }
 
 export interface Geocode {

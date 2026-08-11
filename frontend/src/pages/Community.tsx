@@ -50,7 +50,7 @@ export default function Community() {
           <AsyncState empty="아직 게시글이 없어요. 첫 글을 남겨보세요!" />
         )}
 
-        <div className="space-y-3">
+        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0 xl:grid-cols-3">
           {(data ?? []).map((post) => (
             <article key={post.id} className="card flex gap-3.5 p-4">
               {/* 썸네일 placeholder */}
@@ -87,7 +87,7 @@ export default function Community() {
         type="button"
         onClick={() => navigate('/write')}
         aria-label="글쓰기"
-        className="fixed bottom-[92px] left-1/2 z-30 ml-[119px] flex h-14 w-14 flex-col items-center justify-center rounded-full bg-orange text-white shadow-float active:scale-95"
+        className="fixed bottom-[92px] left-1/2 z-30 ml-[119px] flex h-14 w-14 flex-col items-center justify-center rounded-full bg-orange text-white shadow-float active:scale-95 lg:bottom-8 lg:left-auto lg:right-8 lg:ml-0"
       >
         <PlusIcon className="h-5 w-5" />
         <span className="text-[9px] font-bold">글쓰기</span>

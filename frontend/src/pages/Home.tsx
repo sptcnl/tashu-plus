@@ -16,28 +16,15 @@ import {
   ReportIcon,
   SearchIcon,
 } from '../components/icons'
+import { AMENITY_META } from '../components/map/constants'
 import { amenityLabel } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
-import type { LatLng, Station } from '../types'
+import type { Amenity, AmenityKind, LatLng, Station } from '../types'
 
-type Filter = '전체' | '거점' | '화장실' | '음수대' | '바람주입' | '맛집'
+type Filter = '전체' | '거점' | AmenityKind
 
 const FILTERS: Filter[] = ['전체', '거점', '화장실', '음수대', '바람주입', '맛집']
-
-const matchesFilter = (s: Station, filter: Filter) => {
-  switch (filter) {
-    case '화장실':
-      return s.has_toilet
-    case '음수대':
-      return s.has_water
-    case '바람주입':
-      return s.has_pump
-    case '맛집':
-      return s.nearby_spots.length > 0
-    default:
-      return true // 전체 / 거점
-  }
-}
+const AMENITY_KINDS: AmenityKind[] = ['화장실', '음수대', '바람주입', '맛집']
 
 export default function Home() {
   const navigate = useNavigate()
@@ -45,20 +32,48 @@ export default function Home() {
   const { showToast } = useToast()
   const [filter, setFilter] = useState<Filter>('전체')
   const [selected, setSelected] = useState<Station | null>(null)
+  const [selectedAmenity, setSelectedAmenity] = useState<Amenity | null>(null)
   const [center, setCenter] = useState<LatLng | null>(null)
 
   const stations = useAsync(() => api.stations(), [])
   // 제보는 홈 지도에 빨간 핀으로 표시된다 (제보 화면에서 등록하면 여기 반영).
   const reports = useAsync(() => api.reports(), [])
+  // 편의시설(화장실/음수대/바람주입/맛집)은 대여소와 별개 좌표의 독립 핀.
+  const amenities = useAsync(() => api.amenities(), [])
 
   const source = stations.data?.source ?? 'seed'
   const isDemoData = source === 'seed'
-  const visible = (stations.data?.stations ?? []).filter((s) => matchesFilter(s, filter))
+
+  // 필터에 따라 지도에 뿌릴 거점/편의시설을 나눈다.
+  // 전체 = 거점 + 모든 편의시설, 거점 = 거점만, 그 외 = 해당 종류 편의시설만.
+  const amenityFilter = AMENITY_KINDS.includes(filter as AmenityKind)
+    ? (filter as AmenityKind)
+    : null
+  const showStations = filter === '전체' || filter === '거점'
+  const visible = showStations ? (stations.data?.stations ?? []) : []
+  const allAmenities = amenities.data?.amenities ?? []
+  const visibleAmenities =
+    filter === '전체'
+      ? allAmenities
+      : amenityFilter
+        ? allAmenities.filter((a) => a.kind === amenityFilter)
+        : []
+
+  const selectStation = (station: Station) => {
+    setSelectedAmenity(null)
+    setSelected(station)
+  }
+  const selectAmenity = (amenity: Amenity) => {
+    setSelected(null)
+    setSelectedAmenity(amenity)
+  }
 
   const refresh = () => {
     stations.reload()
     reports.reload()
+    amenities.reload()
     setSelected(null)
+    setSelectedAmenity(null)
     showToast('거점 정보를 갱신했어요.')
   }
 
@@ -86,7 +101,7 @@ export default function Home() {
     <div className="flex h-full flex-col">
       {/* ---------------- 헤더 ---------------- */}
       <header className="relative z-20 shrink-0 bg-white pb-3 pt-3 shadow-card">
-        <div className="relative flex h-11 items-center justify-center">
+        <div className="relative flex h-11 items-center justify-center lg:hidden">
           <button
             type="button"
             onClick={openDrawer}
@@ -143,8 +158,10 @@ export default function Home() {
           className="h-full"
           stations={visible}
           reports={reports.data ?? []}
+          amenities={visibleAmenities}
           selectedStationId={selected?.id ?? null}
-          onStationClick={setSelected}
+          onStationClick={selectStation}
+          onAmenityClick={selectAmenity}
           center={center}
           // 폴백(CSS 지도)에서 플로팅 버튼/CTA 를 피해 핀을 배치한다.
           fallbackInsets={{ top: 9, right: 23, bottom: 27, left: 10 }}
@@ -201,9 +218,58 @@ export default function Home() {
           </div>
         )}
 
+        {/* 편의시설 핀 탭 시 하단 카드 */}
+        {selectedAmenity && (
+          <div className="absolute inset-x-5 bottom-[148px] z-20 lg:left-auto lg:right-5 lg:w-[380px]">
+            <div className="card p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[18px] leading-none">
+                      {AMENITY_META[selectedAmenity.kind].emoji}
+                    </span>
+                    <p className="text-[15px] font-bold">{selectedAmenity.name}</p>
+                    <span
+                      style={{ color: AMENITY_META[selectedAmenity.kind].color }}
+                      className="rounded bg-cream px-1.5 py-0.5 text-[10px] font-bold"
+                    >
+                      {AMENITY_META[selectedAmenity.kind].label}
+                    </span>
+                  </div>
+                  {selectedAmenity.description && (
+                    <p className="mt-1.5 text-[12px] text-navy/55">
+                      {selectedAmenity.description}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAmenity(null)}
+                  aria-label="닫기"
+                  className="-mr-1 -mt-1 px-2 text-[18px] leading-none text-navy/30"
+                >
+                  ×
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(
+                    `/route?from_lat=${selectedAmenity.lat}&from_lng=${selectedAmenity.lng}` +
+                      `&from_name=${encodeURIComponent(selectedAmenity.name)}`,
+                  )
+                }
+                className="mt-3 text-[13px] font-bold text-brand"
+              >
+                &gt; 여기로 길찾기
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 핀 탭 시 하단 거점 카드 (대여하기 CTA 바로 위) */}
         {selected && (
-          <div className="absolute inset-x-5 bottom-[148px] z-20">
+          <div className="absolute inset-x-5 bottom-[148px] z-20 lg:left-auto lg:right-5 lg:w-[380px]">
             <div className="card p-4">
               <div className="flex items-start justify-between">
                 <div>
@@ -258,7 +324,7 @@ export default function Home() {
         )}
 
         {/* 대여하기 CTA */}
-        <div className="absolute inset-x-5 bottom-[88px] z-10">
+        <div className="absolute inset-x-5 bottom-[88px] z-10 lg:left-auto lg:right-5 lg:bottom-5 lg:w-[380px]">
           <button
             type="button"
             disabled={!!selected && selected.available_bikes === 0}

@@ -9,15 +9,18 @@
 import { useEffect, useRef } from 'react'
 import { CustomOverlayMap, Map, MapMarker, useMap } from 'react-kakao-maps-sdk'
 import { useKakaoLoader } from '../../lib/useKakaoLoader'
-import type { LatLng, Report, Station } from '../../types'
+import type { Amenity, LatLng, Report, Station } from '../../types'
 import MapFallback from './MapFallback'
-import { COLORS, DAEJEON_CENTER } from './constants'
+import { AMENITY_META, COLORS, DAEJEON_CENTER } from './constants'
 
 interface Props {
   stations: Station[]
   reports?: Report[]
+  /** 대여소와 별개로 지도에 뿌리는 편의시설 핀 */
+  amenities?: Amenity[]
   selectedStationId?: number | null
   onStationClick?: (station: Station) => void
+  onAmenityClick?: (amenity: Amenity) => void
   /** 지도를 눌러 위치를 지정 (제보 화면) */
   onMapClick?: (point: LatLng) => void
   /** 사용자가 지정한 위치 마커 (제보 화면) */
@@ -76,11 +79,38 @@ function StationBadge({
   )
 }
 
+function AmenityBadge({
+  amenity,
+  onClick,
+}: {
+  amenity: Amenity
+  onClick?: (amenity: Amenity) => void
+}) {
+  const meta = AMENITY_META[amenity.kind]
+  return (
+    <button
+      type="button"
+      aria-label={`${meta.label}: ${amenity.name}`}
+      title={`${meta.label} · ${amenity.name}`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick?.(amenity)
+      }}
+      style={{ borderColor: meta.color }}
+      className="flex h-[30px] w-[30px] items-center justify-center rounded-full border-[2.5px] bg-white text-[15px] leading-none shadow-float transition-transform active:scale-90"
+    >
+      {meta.emoji}
+    </button>
+  )
+}
+
 export default function StationMap({
   stations,
   reports = [],
+  amenities = [],
   selectedStationId = null,
   onStationClick,
+  onAmenityClick,
   onMapClick,
   marker = null,
   center = null,
@@ -98,8 +128,10 @@ export default function StationMap({
           className="h-full"
           stations={stations}
           reports={reports}
+          amenities={amenities}
           selectedStationId={selectedStationId}
           onStationClick={onStationClick}
+          onAmenityClick={onAmenityClick}
           onMapClick={onMapClick ? (p) => onMapClick(p) : undefined}
           marker={marker}
           insets={fallbackInsets}
@@ -113,7 +145,7 @@ export default function StationMap({
     )
   }
 
-  const initialCenter = center ?? stations[0] ?? DAEJEON_CENTER
+  const initialCenter = center ?? stations[0] ?? amenities[0] ?? DAEJEON_CENTER
 
   return (
     <div className={className}>
@@ -142,6 +174,19 @@ export default function StationMap({
               options: { offset: { x: 13, y: 13 } },
             }}
           />
+        ))}
+
+        {/* 편의시설 핀 (화장실/음수대/바람주입/맛집) — 거점 배지보다 아래 */}
+        {amenities.map((amenity) => (
+          <CustomOverlayMap
+            key={`amenity-${amenity.id}`}
+            position={{ lat: amenity.lat, lng: amenity.lng }}
+            yAnchor={0.5}
+            xAnchor={0.5}
+            zIndex={8}
+          >
+            <AmenityBadge amenity={amenity} onClick={onAmenityClick} />
+          </CustomOverlayMap>
         ))}
 
         {/* 거점 배지 */}

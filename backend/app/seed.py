@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import (
+    Amenity,
     Mission,
     Notice,
     Post,
@@ -47,6 +48,27 @@ FACILITIES = [
     ("갑천", 10, False, True, False, ["갑천 야경 포토존"]),
     ("월평", 14, True, True, False, ["월평동 국수집", "월평공원"]),
     ("신흥들삼거리", 8, True, True, False, ["신흥동 빵집"]),
+]
+
+# 지도에 독립 위치 핀으로 찍는 편의시설. 대여소와 별개 좌표를 가진다.
+# (kind, name, lat, lng, description)
+AMENITIES = [
+    # 화장실
+    ("화장실", "시청역 공중화장실", 36.3511, 127.3838, "1번 출구 앞, 24시간 개방"),
+    ("화장실", "한밭수목원 화장실", 36.3668, 127.3881, "동원 입구 옆"),
+    ("화장실", "갈마역 공중화장실", 36.3551, 127.3658, "2번 출구 지하"),
+    # 음수대
+    ("음수대", "보라매공원 음수대", 36.3496, 127.3861, "공원 중앙 광장"),
+    ("음수대", "갑천 자전거길 음수대", 36.3656, 127.3866, "엑스포교 아래 쉼터"),
+    ("음수대", "월평공원 음수대", 36.3601, 127.3621, "진입로 정자 옆"),
+    # 바람주입
+    ("바람주입", "둔산 자전거 공기주입기", 36.3538, 127.3792, "거점 옆 무료 셀프"),
+    ("바람주입", "탄방역 공기주입기", 36.3502, 127.3773, "3번 출구 자전거보관소"),
+    ("바람주입", "갈마역 공기주입기", 36.3545, 127.3669, "거치대 옆 기둥"),
+    # 맛집
+    ("맛집", "갈마시장 칼국수", 36.3540, 127.3651, "현지인 웨이팅 맛집"),
+    ("맛집", "둔산동 맛집거리", 36.3561, 127.3806, "저녁 회식 상권"),
+    ("맛집", "탄방동 곱창골목", 36.3493, 127.3761, "탄방역 도보 5분"),
 ]
 
 # (from_name, to_name, distance_km, reward_points)
@@ -157,6 +179,10 @@ def seed(db: Session) -> None:
                     nearby_spots=spots,
                 )
             )
+
+    if db.scalar(select(Amenity).limit(1)) is None:
+        for kind, name, lat, lng, description in AMENITIES:
+            db.add(Amenity(kind=kind, name=name, lat=lat, lng=lng, description=description))
 
     if db.scalar(select(Mission).limit(1)) is None:
         by_name = {s.name: s.id for s in db.scalars(select(Station)).all()}

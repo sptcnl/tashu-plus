@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import RouteMap from '../components/map/RouteMap'
-import { DAEJEON_CENTER } from '../components/map/constants'
 import PlaceInput from '../components/PlaceInput'
 import type { Place } from '../components/PlaceInput'
 import Screen from '../components/Screen'
@@ -13,37 +12,41 @@ import { useAsync } from '../lib/useAsync'
 import { AsyncState, Badge } from '../components/ui'
 import type { LatLng, RouteCompare as RouteCompareData, RouteKey, RouteOption } from '../types'
 
-// 데모 기본값: 대전시청 → 갈마역 근처
-const DEFAULT_ORIGIN: Place = { name: '대전시청', coord: DAEJEON_CENTER }
-const DEFAULT_DESTINATION: Place = {
-  name: '갈마역',
-  coord: { lat: 36.3547, lng: 127.3663 },
-}
-
 export default function RouteCompare() {
   const [params] = useSearchParams()
   const { showToast } = useToast()
 
-  // 홈 거점 카드의 '여기서 출발하기' 에서 좌표를 넘겨받는다.
-  const initialOrigin: Place = (() => {
+  // 홈 거점/편의시설 카드의 '여기서 출발하기' 에서 좌표를 넘겨받은 경우에만 출발지를 채운다.
+  // 그 외에는 비워 두고, 사용자가 직접 입력해 '경로 찾기' 를 눌러야 조회한다.
+  const initialOrigin: Place | null = (() => {
     const lat = Number(params.get('from_lat'))
     const lng = Number(params.get('from_lng'))
     const name = params.get('from_name')
     if (Number.isFinite(lat) && Number.isFinite(lng) && lat !== 0 && name) {
       return { name, coord: { lat, lng } }
     }
-    return DEFAULT_ORIGIN
+    return null
   })()
 
-  const [origin, setOrigin] = useState<Place>(initialOrigin)
-  const [destination, setDestination] = useState<Place>(DEFAULT_DESTINATION)
-  const [originText, setOriginText] = useState(initialOrigin.name)
-  const [destinationText, setDestinationText] = useState(DEFAULT_DESTINATION.name)
+  const [origin, setOrigin] = useState<Place | null>(initialOrigin)
+  const [destination, setDestination] = useState<Place | null>(null)
+  const [originText, setOriginText] = useState(initialOrigin?.name ?? '')
+  const [destinationText, setDestinationText] = useState('')
 
   const [data, setData] = useState<RouteCompareData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [openKey, setOpenKey] = useState<RouteKey | null>('tashu')
+  // 기본적으로 세 경로의 지도를 모두 펼쳐 둔다 (각각 접기/펼치기 가능).
+  const [openKeys, setOpenKeys] = useState<Set<RouteKey>>(
+    () => new Set<RouteKey>(['tashu', 'transit', 'walk']),
+  )
+  const toggleOpen = (key: RouteKey) =>
+    setOpenKeys((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   // 어느 입력이 실패했는지 따로 보여준다 (토스트는 금방 사라져서 이유를 놓치기 쉽다).
   const [originError, setOriginError] = useState<string | null>(null)
   const [destinationError, setDestinationError] = useState<string | null>(null)
@@ -64,37 +67,32 @@ export default function RouteCompare() {
     }
   }, [])
 
-  useEffect(() => {
-    void compare(origin, destination)
-    // 최초 1회만. 이후에는 '경로 다시 찾기' 버튼이나 자동완성 선택으로 갱신한다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  // 자동 조회 없음: 출발/도착을 입력하고 '경로 찾기' 를 눌러야 계산한다.
 
   /**
-   * 텍스트 하나를 좌표로 변환. 실패하면 예외를 던지지 않고 사유를 반환해서
-   * 한쪽이 실패해도 다른 쪽 검색과 경로 조회가 계속 진행되게 한다.
+   * 텍스트 하나를 좌표로 변환. 비어 있거나 못 찾으면 place=null 과 사유를 반환한다.
+   * 이미 고른(또는 넘겨받은) 위치의 이름 그대로면 재검색 없이 그 좌표를 재사용한다.
    */
   const resolvePlace = async (
     text: string,
-    fallback: Place,
-  ): Promise<{ place: Place; error: string | null }> => {
+    current: Place | null,
+  ): Promise<{ place: Place | null; error: string | null }> => {
     const query = text.trim()
-    if (!query || query === fallback.name) return { place: fallback, error: null }
+    if (!query) return { place: null, error: null }
+    if (current && query === current.name) return { place: current, error: null }
     try {
       const hit = await api.geocode(query)
       return { place: { name: hit.name, coord: { lat: hit.lat, lng: hit.lng } }, error: null }
     } catch (err) {
-      // 찾지 못하면 이전 위치를 그대로 유지한다 (화면이 비어버리지 않게).
       return {
-        place: fallback,
+        place: null,
         error: err instanceof Error ? err.message : '위치를 찾지 못했습니다.',
       }
     }
   }
 
-  /** 입력된 텍스트를 좌표로 바꾼 뒤 경로를 다시 조회한다. */
+  /** 입력된 텍스트를 좌표로 바꾼 뒤, 둘 다 확정되면 경로를 조회한다. */
   const search = async () => {
-    setLoading(true)
     const [from, to] = await Promise.all([
       resolvePlace(originText, origin),
       resolvePlace(destinationText, destination),
@@ -102,32 +100,41 @@ export default function RouteCompare() {
 
     setOriginError(from.error)
     setDestinationError(to.error)
-    setOrigin(from.place)
-    setDestination(to.place)
-    setOriginText(from.place.name)
-    setDestinationText(to.place.name)
-
-    if (from.error || to.error) {
-      showToast(from.error ?? to.error ?? '위치를 찾지 못했습니다.', 'error')
+    if (from.place) {
+      setOrigin(from.place)
+      setOriginText(from.place.name)
+    }
+    if (to.place) {
+      setDestination(to.place)
+      setDestinationText(to.place.name)
     }
 
-    // 한쪽만 실패했더라도 남은 좌표로 경로는 계속 보여준다.
+    // 출발지/도착지가 모두 확정돼야 조회한다.
+    if (!from.place || !to.place) {
+      const message =
+        from.error ??
+        to.error ??
+        (!from.place ? '출발지를 입력해주세요.' : '도착지를 입력해주세요.')
+      showToast(message, 'error')
+      return
+    }
+
     await compare(from.place, to.place)
   }
 
-  /** 자동완성에서 거점을 고르면 바로 경로를 다시 계산한다. */
+  /** 자동완성에서 거점을 고르면, 반대쪽도 이미 있으면 바로 경로를 계산한다. */
   const pickOrigin = (place: Place) => {
     setOrigin(place)
     setOriginText(place.name)
     setOriginError(null)
-    void compare(place, destination)
+    if (destination) void compare(place, destination)
   }
 
   const pickDestination = (place: Place) => {
     setDestination(place)
     setDestinationText(place.name)
     setDestinationError(null)
-    void compare(origin, place)
+    if (origin) void compare(origin, place)
   }
 
   const useCurrentLocation = () => {
@@ -198,7 +205,7 @@ export default function RouteCompare() {
         disabled={loading}
         className="mt-3 h-10 w-full rounded-xl bg-brand text-[13px] font-bold text-white active:opacity-80 disabled:opacity-50"
       >
-        {loading ? '경로 찾는 중…' : '경로 다시 찾기'}
+        {loading ? '경로 찾는 중…' : data ? '경로 다시 찾기' : '경로 찾기'}
       </button>
 
       <div className="mb-3 mt-6 flex items-end justify-between">
@@ -214,22 +221,30 @@ export default function RouteCompare() {
         )}
       </div>
 
+      {!loading && !error && !data && (
+        <p className="mt-10 text-center text-[13px] text-navy/40">
+          출발지와 도착지를 입력하고 경로를 찾아보세요.
+        </p>
+      )}
+
       {(loading || error) && (
         <AsyncState
           loading={loading}
           error={error}
-          onRetry={() => void compare(origin, destination)}
+          onRetry={() => {
+            if (origin && destination) void compare(origin, destination)
+          }}
         />
       )}
 
       {!loading && !error && data && (
-        <div className="space-y-3">
+        <div className="space-y-3 lg:grid lg:grid-cols-3 lg:items-start lg:gap-3 lg:space-y-0">
           {data.options.map((option) => (
             <RouteCard
               key={option.key}
               option={option}
-              open={openKey === option.key}
-              onToggle={() => setOpenKey(openKey === option.key ? null : option.key)}
+              open={openKeys.has(option.key)}
+              onToggle={() => toggleOpen(option.key)}
               origin={data.origin_coord}
               destination={data.destination_coord}
             />

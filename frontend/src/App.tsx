@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
+import DesktopSidebar from './components/DesktopSidebar'
 import { DrawerProvider } from './components/Drawer'
 import { ToastProvider } from './components/Toast'
 import Community from './pages/Community'
@@ -18,9 +19,10 @@ import Support from './pages/Support'
 export default function App() {
   return (
     <ToastProvider>
-      {/* 모바일 뷰포트 기준 프레임 (max-width 390px 중앙 정렬) */}
-      <div className="mx-auto h-dvh w-full max-w-phone overflow-hidden bg-cream shadow-xl">
-        <div className="relative h-full overflow-hidden">
+      {/* 반응형 셸: 모바일은 390px 폰 프레임, lg 이상은 좌측 사이드바 + 넓은 본문 */}
+      <div className="flex min-h-dvh justify-center bg-[#E7E4DE] lg:justify-start">
+        <DesktopSidebar className="hidden lg:flex" />
+        <div className="relative h-dvh w-full max-w-phone overflow-hidden bg-cream shadow-xl lg:max-w-none lg:flex-1 lg:shadow-none">
           <DrawerProvider>
             <Routes>
               <Route path="/" element={<Home />} />

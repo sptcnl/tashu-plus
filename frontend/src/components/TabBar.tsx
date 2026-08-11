@@ -12,7 +12,7 @@ const TABS = [
 
 export default function TabBar() {
   return (
-    <nav className="absolute inset-x-0 bottom-0 z-30 flex h-[72px] items-start border-t border-black/5 bg-white pt-2.5">
+    <nav className="absolute inset-x-0 bottom-0 z-30 flex h-[72px] items-start border-t border-black/5 bg-white pt-2.5 lg:hidden">
       {TABS.map(({ to, label, Icon }) => (
         <NavLink key={to} to={to} end={to === '/'} className="flex-1">
           {({ isActive }) => (

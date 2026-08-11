@@ -22,6 +22,7 @@ def _to_kst(value: datetime) -> str:
 # 응답에 쓰는 datetime 은 전부 이 타입을 통해 KST 로 내려간다.
 KSTDateTime = Annotated[datetime, PlainSerializer(_to_kst, return_type=str)]
 
+AmenityKind = Literal["화장실", "음수대", "바람주입", "맛집"]
 ReportCategory = Literal["공사구간", "불법주정차", "도로파손", "조명없음"]
 ReportStatus = Literal["접수", "처리중", "완료"]
 MissionStatus = Literal["대기", "진행중", "완료"]
@@ -84,6 +85,24 @@ class GeocodeOut(BaseModel):
     address: str = ""
     lat: float
     lng: float
+
+
+# ---------------------------------------------------------------- 편의시설 핀
+
+
+class AmenityOut(ORMModel):
+    id: int
+    kind: str  # 화장실 / 음수대 / 바람주입 / 맛집
+    name: str
+    lat: float
+    lng: float
+    description: str | None = None
+
+
+class AmenityListOut(BaseModel):
+    source: Literal["kakao", "seed"] = "seed"  # kakao = 실시간 검색, seed = 폴백
+    count: int
+    amenities: list[AmenityOut]
 
 
 # ---------------------------------------------------------------- 경로 비교

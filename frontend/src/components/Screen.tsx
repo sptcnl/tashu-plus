@@ -53,19 +53,21 @@ export default function Screen({
       )}
 
       <main
-        className={`flex-1 overflow-y-auto ${padded ? 'px-5 py-5' : ''} ${
+        className={`flex-1 overflow-y-auto ${padded ? 'px-5 py-5 lg:px-8' : ''} ${
           // 푸터가 있으면 푸터가 탭바 위 공간을 이미 차지하므로 여백이 필요 없다.
-          tabBar && !footer ? 'pb-[76px]' : ''
+          // 데스크톱에는 하단 탭바가 없으므로 여백을 없앤다(lg:pb-0).
+          tabBar && !footer ? 'pb-[76px] lg:pb-8' : ''
         }`}
       >
-        {children}
+        {/* 넓은 화면에서는 본문 폭을 제한해 가독성을 유지한다. */}
+        <div className="mx-auto w-full lg:max-w-4xl">{children}</div>
       </main>
 
       {footer && (
         <div
-          className={`shrink-0 border-t border-black/5 bg-white px-5 py-3 ${tabBar ? 'mb-[72px]' : ''}`}
+          className={`shrink-0 border-t border-black/5 bg-white px-5 py-3 ${tabBar ? 'mb-[72px] lg:mb-0' : ''}`}
         >
-          {footer}
+          <div className="mx-auto w-full lg:max-w-4xl">{footer}</div>
         </div>
       )}
 

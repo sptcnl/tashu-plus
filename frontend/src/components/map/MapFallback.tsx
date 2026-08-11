@@ -6,7 +6,8 @@
  */
 
 import type { MouseEvent } from 'react'
-import type { Report, Station } from '../../types'
+import type { Amenity, Report, Station } from '../../types'
+import { AMENITY_META } from './constants'
 
 interface Point {
   lat: number
@@ -98,10 +99,12 @@ const DENSITY_COLOR: Record<Station['density'], string> = {
 interface Props {
   stations?: Station[]
   reports?: Report[]
+  amenities?: Amenity[]
   /** 'bikes' = 잔여 대수 표시, 'density' = 집중도(과잉/부족) 색상 */
   mode?: 'bikes' | 'density'
   selectedStationId?: number | null
   onStationClick?: (station: Station) => void
+  onAmenityClick?: (amenity: Amenity) => void
   /** 지도를 눌러 위치를 지정할 때 (제보 화면) */
   onMapClick?: (point: Point) => void
   /** 사용자가 지정한 위치 마커 */
@@ -115,17 +118,19 @@ interface Props {
 export default function MapFallback({
   stations = [],
   reports = [],
+  amenities = [],
   mode = 'bikes',
   selectedStationId = null,
   onStationClick,
+  onAmenityClick,
   onMapClick,
   marker = null,
   insets,
   className = 'h-[420px]',
   children,
 }: Props) {
-  // 투영 기준점: 거점 + 제보. 둘 다 없으면 대전 시내 대략 범위로 폴백한다.
-  const basis: Point[] = [...stations, ...reports]
+  // 투영 기준점: 거점 + 제보 + 편의시설. 모두 없으면 대전 시내 대략 범위로 폴백한다.
+  const basis: Point[] = [...stations, ...reports, ...amenities]
   const points = basis.length
     ? basis
     : [
@@ -148,6 +153,12 @@ export default function MapFallback({
     const xy = spread(taken, proj.toXY(s), resolvedInsets)
     taken.push(xy)
     stationXY.set(s.id, xy)
+  }
+  const amenityXY = new Map<number, { x: number; y: number }>()
+  for (const a of amenities) {
+    const xy = spread(taken, proj.toXY(a), resolvedInsets)
+    taken.push(xy)
+    amenityXY.set(a.id, xy)
   }
 
   const handleClick = (e: MouseEvent<HTMLDivElement>) => {
@@ -196,6 +207,28 @@ export default function MapFallback({
         )
       })}
 
+      {/* ---- 편의시설 핀 (화장실/음수대/바람주입/맛집) ---- */}
+      {amenities.map((a) => {
+        const { x, y } = amenityXY.get(a.id) ?? proj.toXY(a)
+        const meta = AMENITY_META[a.kind]
+        return (
+          <button
+            key={`amenity-${a.id}`}
+            type="button"
+            aria-label={`${meta.label}: ${a.name}`}
+            title={`${meta.label} · ${a.name}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              onAmenityClick?.(a)
+            }}
+            style={{ left: `${x}%`, top: `${y}%`, borderColor: meta.color }}
+            className="absolute flex h-[30px] w-[30px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[2.5px] bg-white text-[15px] leading-none shadow-float active:scale-90"
+          >
+            {meta.emoji}
+          </button>
+        )
+      })}
+
       {/* ---- 거점 핀 ---- */}
       {stations.map((s) => {
         const { x, y } = stationXY.get(s.id) ?? proj.toXY(s)
@@ -217,7 +250,8 @@ export default function MapFallback({
               selected ? 'z-20 scale-125 ring-orange' : 'ring-white'
             }`}
           >
-            {s.available_bikes}
+            {/* 집중도 지도에서는 숫자를 빼고 색상(집중도)만 보여준다. */}
+            {mode === 'density' ? '' : s.available_bikes}
           </button>
         )
       })}

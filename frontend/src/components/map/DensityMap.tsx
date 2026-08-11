@@ -3,7 +3,7 @@
  * 거치대 대비 잔여 비율(fill_ratio)로 과잉(빨강) / 부족(파랑) 을 원 크기와 색으로 표현한다.
  */
 
-import { Circle, CustomOverlayMap, Map } from 'react-kakao-maps-sdk'
+import { Circle, Map } from 'react-kakao-maps-sdk'
 import { useKakaoLoader } from '../../lib/useKakaoLoader'
 import type { Station } from '../../types'
 import MapFallback from './MapFallback'
@@ -52,23 +52,6 @@ export default function DensityMap({
             />
           )
         })}
-
-        {stations.map((station) => (
-          <CustomOverlayMap
-            key={`label-${station.id}`}
-            position={{ lat: station.lat, lng: station.lng }}
-            yAnchor={0.5}
-            xAnchor={0.5}
-          >
-            <div
-              title={`${station.name} · ${station.density} · ${station.available_bikes}/${station.rack_count}대`}
-              className="whitespace-nowrap rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-bold text-navy shadow"
-            >
-              {station.name} {station.available_bikes}
-              {station.rack_count > 0 && `/${station.rack_count}`}
-            </div>
-          </CustomOverlayMap>
-        ))}
       </Map>
     </div>
   )

@@ -19,7 +19,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import has_kakao_key, has_tashu_key
 from .database import Base, SessionLocal, engine
-from .routers import geocode, me, missions, notices, posts, reports, routes, stations
+from .routers import (
+    amenities,
+    geocode,
+    me,
+    missions,
+    notices,
+    posts,
+    reports,
+    routes,
+    stations,
+)
 from .seed import seed
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -66,7 +76,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (stations, routes, geocode, reports, missions, posts, me, notices):
+for module in (stations, amenities, routes, geocode, reports, missions, posts, me, notices):
     app.include_router(module.router, prefix="/api")
 
 

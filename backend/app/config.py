@@ -54,6 +54,10 @@ KAKAO_API_BASE = _env("KAKAO_API_BASE", "https://dapi.kakao.com")
 # 공공 API 를 매 요청마다 때리지 않기 위한 인메모리 캐시 TTL
 TASHU_CACHE_TTL_SECONDS = int(_env("TASHU_CACHE_TTL_SECONDS", "60"))
 
+# 편의시설(화장실/음수대/바람주입/맛집) 카카오 검색 결과 캐시 TTL.
+# POI 는 자주 바뀌지 않으므로 넉넉히 잡아 카카오 호출 수를 줄인다.
+AMENITY_CACHE_TTL_SECONDS = int(_env("AMENITY_CACHE_TTL_SECONDS", "600"))
+
 # 외부 API 타임아웃 (초)
 HTTP_TIMEOUT_SECONDS = float(_env("HTTP_TIMEOUT_SECONDS", "5"))
 

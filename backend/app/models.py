@@ -50,6 +50,23 @@ class StationFacility(Base):
     nearby_spots: Mapped[list] = mapped_column(JSON, default=list)
 
 
+class Amenity(Base):
+    """지도에 독립 위치 핀으로 찍는 편의시설.
+
+    대여소(Station)와 별개로 자체 좌표를 가진다.
+    kind: 화장실 / 음수대 / 바람주입 / 맛집
+    """
+
+    __tablename__ = "amenities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(80), nullable=False)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lng: Mapped[float] = mapped_column(Float, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
 class Report(Base):
     """불편한 길 제보. category: 공사구간/불법주정차/도로파손/조명없음."""
 
