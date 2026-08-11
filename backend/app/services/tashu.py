@@ -108,7 +108,11 @@ _cache = _Cache(TASHU_CACHE_TTL_SECONDS)
 def _parse_station(raw: dict) -> LiveStation | None:
     """응답 항목 하나를 LiveStation 으로. 좌표/수량이 문자열로 와도 견디게 한다."""
     try:
-        station_id = int(raw["id"])
+        # 실제 API 의 id 는 "ST0003" 같은 문자열이라 숫자만 뽑아 정수로 만든다.
+        # (문서 예시는 정수였지만 운영 응답과 형식이 다르다.)
+        raw_id = str(raw["id"]).strip()
+        digits = "".join(ch for ch in raw_id if ch.isdigit())
+        station_id = int(digits)
         name = str(raw.get("name") or "").strip()
         # x_pos = 위도, y_pos = 경도 (필드 이름과 축이 반대)
         lat = float(raw["x_pos"])
