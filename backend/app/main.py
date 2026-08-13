@@ -17,6 +17,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from .config import has_kakao_key, has_tashu_key
 from .database import Base, SessionLocal, engine
@@ -85,6 +86,15 @@ app.add_middleware(
 
 for module in (stations, amenities, routes, geocode, reports, missions, posts, me, notices):
     app.include_router(module.router, prefix="/api")
+
+
+@app.get("/", include_in_schema=False)
+def root():
+    """API 전용 서비스라 루트에는 라우트가 없다.
+
+    주소를 브라우저에 그냥 붙여넣는 경우가 많아서, 맨손 404 대신 문서로 보낸다.
+    """
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/api/health", tags=["health"], summary="헬스체크 / 외부 연동 상태")

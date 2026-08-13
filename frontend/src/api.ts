@@ -78,8 +78,21 @@ export const api = {
     ),
 
   // 편의시설 위치 핀 (화장실/음수대/바람주입/맛집)
-  amenities: (kind?: AmenityKind) =>
-    get<AmenityList>(kind ? `/amenities?kind=${encodeURIComponent(kind)}` : '/amenities'),
+  /**
+   * 편의시설 핀. 기준 좌표를 넘기면 그 주변을 검색한다.
+   * (안 넘기면 대전시청 기준이라 결과가 시청 근처에만 몰린다)
+   */
+  amenities: (kind?: AmenityKind, center?: LatLng, radius = 3000) => {
+    const params = new URLSearchParams()
+    if (kind) params.set('kind', kind)
+    if (center) {
+      params.set('lat', String(center.lat))
+      params.set('lng', String(center.lng))
+      params.set('radius', String(radius))
+    }
+    const qs = params.toString()
+    return get<AmenityList>(qs ? `/amenities?${qs}` : '/amenities')
+  },
 
   // 장소명 → 좌표 (경로 화면 입력용)
   geocode: (query: string) =>

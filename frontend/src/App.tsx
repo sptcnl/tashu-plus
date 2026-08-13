@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import DesktopSidebar from './components/DesktopSidebar'
 import { DrawerProvider } from './components/Drawer'
+import { LocationProvider } from './components/LocationProvider'
 import { ToastProvider } from './components/Toast'
 import Community from './pages/Community'
 import History from './pages/History'
@@ -19,6 +20,8 @@ import Support from './pages/Support'
 export default function App() {
   return (
     <ToastProvider>
+      {/* 진입 즉시 위치 권한을 요청해서 홈 지도 중심 / 주변 거점 검색에 쓴다 */}
+      <LocationProvider>
       {/* 반응형 셸: 모바일은 390px 폰 프레임, lg 이상은 좌측 사이드바 + 넓은 본문 */}
       <div className="flex min-h-dvh justify-center bg-[#E7E4DE] lg:justify-start">
         <DesktopSidebar className="hidden lg:flex" />
@@ -45,6 +48,7 @@ export default function App() {
           </DrawerProvider>
         </div>
       </div>
+      </LocationProvider>
     </ToastProvider>
   )
 }

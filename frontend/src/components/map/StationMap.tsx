@@ -6,7 +6,7 @@
  * 제보는 같은 지도에 빨간 마커로 겹쳐 그린다.
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { CustomOverlayMap, Map, MapMarker, useMap } from 'react-kakao-maps-sdk'
 import { useKakaoLoader } from '../../lib/useKakaoLoader'
 import type { Amenity, LatLng, Report, Station } from '../../types'
@@ -27,22 +27,45 @@ interface Props {
   marker?: LatLng | null
   /** 지도를 이 좌표로 이동시킨다 (내 위치 버튼 등) */
   center?: LatLng | null
+  /** 사용자가 지도를 옮기거나 확대/축소한 뒤 중심이 바뀌면 알려준다 */
+  onCenterChanged?: (center: LatLng) => void
   level?: number
   className?: string
   /** 폴백 화면에서 핀이 UI 에 가리지 않도록 하는 여백 (%) */
   fallbackInsets?: { top: number; right: number; bottom: number; left: number }
 }
 
-/** center prop 이 바뀔 때 지도를 부드럽게 이동시키는 헬퍼 (Map 의 자식으로만 동작). */
+/** 지도 이동/확대가 끝났을 때(idle) 중심 좌표를 알려준다. */
+function CenterWatcher({ onChange }: { onChange: (center: LatLng) => void }) {
+  const map = useMap()
+
+  useEffect(() => {
+    const notify = () => {
+      const c = map.getCenter()
+      onChange({ lat: c.getLat(), lng: c.getLng() })
+    }
+    // 'idle' 은 드래그/줌이 멈춘 뒤 한 번만 발생해서 과호출이 없다.
+    kakao.maps.event.addListener(map, 'idle', notify)
+    return () => {
+      kakao.maps.event.removeListener(map, 'idle', notify)
+    }
+  }, [map, onChange])
+
+  return null
+}
+
+/**
+ * center prop 이 바뀔 때 지도를 부드럽게 이동시키는 헬퍼 (Map 의 자식으로만 동작).
+ *
+ * 좌표값으로 중복을 걸러내면 안 된다. 지도를 옮긴 뒤 '내위치' 를 다시 눌렀을 때
+ * 좌표가 이전과 같아서 이동이 무시돼 버린다. 호출부가 새 객체를 넘길 때마다
+ * (= 의도적으로 이동을 요청할 때마다) 이동한다.
+ */
 function Recenter({ center }: { center: LatLng | null | undefined }) {
   const map = useMap()
-  const lastRef = useRef<string>('')
 
   useEffect(() => {
     if (!center) return
-    const key = `${center.lat},${center.lng}`
-    if (key === lastRef.current) return
-    lastRef.current = key
     map.panTo(new kakao.maps.LatLng(center.lat, center.lng))
   }, [center, map])
 
@@ -114,6 +137,7 @@ export default function StationMap({
   onMapClick,
   marker = null,
   center = null,
+  onCenterChanged,
   level = 6,
   className = 'h-full',
   fallbackInsets,
@@ -161,6 +185,7 @@ export default function StationMap({
         }}
       >
         <Recenter center={center} />
+        {onCenterChanged && <CenterWatcher onChange={onCenterChanged} />}
 
         {/* 제보 핀 (빨간 마커) — 거점 배지보다 아래에 깔린다 */}
         {reports.map((report) => (

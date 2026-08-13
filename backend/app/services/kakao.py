@@ -322,28 +322,50 @@ async def search_places(
     lng: float,
     radius: int = 20000,
     size: int = 15,
+    pages: int = 1,
 ) -> list[dict] | None:
     """키워드로 특정 좌표 주변 장소 '여러 곳' 을 좌표와 함께 찾는다 (편의시설 핀 용도).
 
     - x=경도(lng), y=위도(lat), radius(m) 안에서 가까운 순으로.
+    - 카카오 키워드 검색은 한 번에 최대 15건이라, pages 로 여러 장을 이어 받는다
+      (size × page 는 45 를 넘을 수 없다).
     - 키가 없거나 호출이 실패하면 None (호출자가 seed 로 폴백).
     - 결과가 0건이면 빈 리스트를 돌려준다 (호출은 성공했으나 해당 종류가 없는 것).
     """
-    payload = await _get(
-        KEYWORD_PATH,
-        {
+    page_size = max(1, min(size, 15))
+    max_pages = max(1, min(pages, 45 // page_size))
+
+    documents: list = []
+    any_ok = False
+    for page in range(1, max_pages + 1):
+        params = {
             "query": query,
             "x": str(lng),
             "y": str(lat),
             "radius": max(0, min(radius, 20000)),
-            "size": max(1, min(size, 15)),
+            "size": page_size,
+            "page": page,
             "sort": "distance",
-        },
-    )
-    if not payload:
-        return None
-    documents = payload.get("documents")
-    if not isinstance(documents, list):
+        }
+        payload = await _get(KEYWORD_PATH, params)
+        if not payload and page == 1:
+            # 첫 페이지가 실패하면 그 종류가 통째로 사라진다(예: 맛집 0곳).
+            # 라즈베리파이에서 간헐적 타임아웃이 나므로 한 번은 다시 시도한다.
+            logger.info("카카오 키워드 '%s' 1페이지 재시도", query)
+            payload = await _get(KEYWORD_PATH, params)
+        if not payload:
+            break
+        docs = payload.get("documents")
+        if not isinstance(docs, list):
+            break
+        any_ok = True
+        documents.extend(docs)
+        # 마지막 페이지면 더 요청하지 않는다.
+        meta = payload.get("meta") or {}
+        if meta.get("is_end") or len(docs) < page_size:
+            break
+
+    if not any_ok:
         return None
 
     places: list[dict] = []

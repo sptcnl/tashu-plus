@@ -21,9 +21,16 @@ router = APIRouter(prefix="/amenities", tags=["amenities"])
 )
 async def list_amenities(
     kind: AmenityKind | None = Query(None, description="종류로 필터 (미지정 시 전체)"),
+    lat: float | None = Query(
+        None, ge=-90, le=90, description="검색 기준 위도 (미지정 시 대전시청)"
+    ),
+    lng: float | None = Query(
+        None, ge=-180, le=180, description="검색 기준 경도 (미지정 시 대전시청)"
+    ),
+    radius: int = Query(3000, gt=0, le=20000, description="검색 반경 (미터, 최대 20km)"),
     db: Session = Depends(get_db),
 ):
-    views, source = await get_amenities(db, kind)
+    views, source = await get_amenities(db, kind, lat=lat, lng=lng, radius=radius)
     return AmenityListOut(
         source=source,
         count=len(views),

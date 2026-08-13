@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api } from '../api'
 import RouteMap from '../components/map/RouteMap'
 import PlaceInput from '../components/PlaceInput'
@@ -14,6 +14,7 @@ import type { LatLng, RouteCompare as RouteCompareData, RouteKey, RouteOption } 
 
 export default function RouteCompare() {
   const [params] = useSearchParams()
+  const navigate = useNavigate()
   const { showToast } = useToast()
 
   // 홈 거점/편의시설 카드의 '여기서 출발하기' 에서 좌표를 넘겨받은 경우에만 출발지를 채운다.
@@ -199,14 +200,35 @@ export default function RouteCompare() {
         />
       </div>
 
-      <button
-        type="button"
-        onClick={() => void search()}
-        disabled={loading}
-        className="mt-3 h-10 w-full rounded-xl bg-brand text-[13px] font-bold text-white active:opacity-80 disabled:opacity-50"
-      >
-        {loading ? '경로 찾는 중…' : data ? '경로 다시 찾기' : '경로 찾기'}
-      </button>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={() => void search()}
+          disabled={loading}
+          className="h-10 flex-1 rounded-xl bg-brand text-[13px] font-bold text-white active:opacity-80 disabled:opacity-50"
+        >
+          {loading ? '경로 찾는 중…' : data ? '경로 다시 찾기' : '경로 찾기'}
+        </button>
+        {/*
+          편의시설(맛집/화장실…)은 카카오가 기준점에서 가까운 순으로만 주기 때문에
+          도착지 주변을 보려면 기준점을 옮겨야 한다. 그 좌표로 홈 지도를 열어준다.
+          도착지가 정해지기 전에는 누를 게 없으니 숨긴다.
+        */}
+        {destination && (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(
+                `/?lat=${destination.coord.lat}&lng=${destination.coord.lng}` +
+                  `&label=${encodeURIComponent(destination.name)}`,
+              )
+            }
+            className="h-10 shrink-0 rounded-xl bg-white px-3 text-[12px] font-bold text-brand shadow-card active:opacity-80"
+          >
+            도착지 주변 보기
+          </button>
+        )}
+      </div>
 
       <div className="mb-3 mt-6 flex items-end justify-between">
         <p className="text-[13px] font-medium text-navy/55">추천 경로 3가지를 비교해보세요</p>

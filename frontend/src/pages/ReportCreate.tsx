@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { useLocation } from '../components/LocationProvider'
 import StationMap from '../components/map/StationMap'
 import Screen from '../components/Screen'
 import { useToast } from '../components/Toast'
@@ -15,6 +16,8 @@ export default function ReportCreate() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const fileInput = useRef<HTMLInputElement>(null)
+  // 앱 진입 시 받아둔 내 위치 — 지도 첫 렌더링 중심으로 쓴다
+  const { coord } = useLocation()
 
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null)
   const [category, setCategory] = useState<ReportCategory | null>(null)
@@ -61,7 +64,9 @@ export default function ReportCreate() {
           reports={reports ?? []}
           marker={point}
           onMapClick={setPoint}
-          level={6}
+          // 첫 렌더링을 내 위치 중심으로 (제보할 곳은 보통 지금 있는 곳 근처)
+          center={coord}
+          level={5}
         />
       </div>
       <p className="mt-3 text-center text-[13px] font-medium text-navy/55">

@@ -18,9 +18,17 @@ from .kakao import search_places
 
 logger = logging.getLogger(__name__)
 
-# 검색 기준점 — 대전시청 인근. 반경 20km 로 대전 전역을 덮는다.
+# 좌표가 안 넘어올 때 쓰는 기본 기준점 (대전시청)
 DAEJEON_CENTER = (36.3504, 127.3845)  # (lat, lng)
-SEARCH_RADIUS_M = 20000
+SEARCH_RADIUS_M = 3000
+
+# 카카오 키워드 검색은 'sort=distance' 로 기준점에서 가까운 순 15건씩 준다.
+# 한 종류당 3페이지(최대 45건)까지 받아서 주변을 촘촘히 채운다.
+PAGES_PER_KIND = 3
+
+# 캐시 키를 만들 때 좌표를 이 자리수로 뭉갠다 (약 100m). 지도를 조금 움직였다고
+# 매번 카카오를 새로 때리지 않게 하려는 것.
+COORD_PRECISION = 3
 
 # 종류 -> 카카오 키워드. 순서가 응답 순서가 된다.
 # '바람주입': 카카오에 자전거 공기주입기 POI 가 0건이라, 실제로 바람을 넣을 수 있는
@@ -43,41 +51,50 @@ class AmenityView:
 
 
 class _Cache:
-    """TTL 인메모리 캐시 (services/tashu.py 와 같은 구조)."""
+    """기준 좌표별 TTL 인메모리 캐시.
 
-    def __init__(self, ttl_seconds: int) -> None:
+    결과가 기준 좌표에 따라 달라지므로 좌표를 키로 쓴다 (약 100m 단위로 뭉갬).
+    지도를 조금씩 움직일 때 카카오를 반복 호출하지 않게 해준다.
+    """
+
+    def __init__(self, ttl_seconds: int, max_entries: int = 32) -> None:
         self._ttl = ttl_seconds
-        self._value: list[AmenityView] | None = None
-        self._fetched_at: float = 0.0
+        self._max_entries = max_entries
+        self._entries: dict[tuple, tuple[float, list[AmenityView]]] = {}
         self._lock = asyncio.Lock()
 
-    def _fresh(self) -> bool:
-        return self._value is not None and (time.monotonic() - self._fetched_at) < self._ttl
+    async def get(self, lat: float, lng: float, radius: int) -> list[AmenityView] | None:
+        key = (round(lat, COORD_PRECISION), round(lng, COORD_PRECISION), radius)
+        hit = self._entries.get(key)
+        if hit and (time.monotonic() - hit[0]) < self._ttl:
+            return hit[1]
 
-    async def get(self) -> list[AmenityView] | None:
-        if self._fresh():
-            return self._value
         async with self._lock:
-            if self._fresh():
-                return self._value
-            fetched = await _fetch_all()
+            hit = self._entries.get(key)
+            if hit and (time.monotonic() - hit[0]) < self._ttl:
+                return hit[1]
+
+            fetched = await _fetch_all(lat, lng, radius)
             if fetched is not None:
-                self._value = fetched
-                self._fetched_at = time.monotonic()
+                # 메모리가 무한히 늘지 않게 오래된 항목부터 버린다.
+                if len(self._entries) >= self._max_entries:
+                    oldest = min(self._entries, key=lambda k: self._entries[k][0])
+                    self._entries.pop(oldest, None)
+                self._entries[key] = (time.monotonic(), fetched)
                 return fetched
-            # 실패: 오래된 값이라도 있으면 재사용, 없으면 None (seed 폴백)
-            return self._value
+
+            # 실패: 만료된 값이라도 있으면 재사용, 없으면 None (seed 폴백)
+            return hit[1] if hit else None
 
     def clear(self) -> None:
-        self._value = None
-        self._fetched_at = 0.0
+        self._entries.clear()
 
 
 _cache = _Cache(AMENITY_CACHE_TTL_SECONDS)
 
 
-async def _fetch_all() -> list[AmenityView] | None:
-    """4종을 카카오에서 병렬로 긁어 하나의 리스트로.
+async def _fetch_all(lat: float, lng: float, radius: int) -> list[AmenityView] | None:
+    """주어진 기준 좌표 주변에서 4종을 카카오에서 병렬로 긁어 하나의 리스트로.
 
     - 키가 없으면 None.
     - 모든 종류 호출이 실패하면(예: 키 IP 차단) None → 호출자가 seed 로 폴백.
@@ -86,11 +103,12 @@ async def _fetch_all() -> list[AmenityView] | None:
     if not has_kakao_key():
         return None
 
-    lat, lng = DAEJEON_CENTER
     kinds = list(KIND_QUERIES.items())
     results = await asyncio.gather(
         *(
-            search_places(query, lat=lat, lng=lng, radius=SEARCH_RADIUS_M, size=15)
+            search_places(
+                query, lat=lat, lng=lng, radius=radius, size=15, pages=PAGES_PER_KIND
+            )
             for _, query in kinds
         )
     )
@@ -126,9 +144,23 @@ def _seed_views(db: Session, kind: str | None) -> list[AmenityView]:
     return [AmenityView(a.kind, a.name, a.lat, a.lng, a.description) for a in rows]
 
 
-async def get_amenities(db: Session, kind: str | None = None) -> tuple[list[AmenityView], str]:
-    """(편의시설 목록, source). source 는 "kakao" 또는 "seed"."""
-    live = await _cache.get()
+async def get_amenities(
+    db: Session,
+    kind: str | None = None,
+    *,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius: int = SEARCH_RADIUS_M,
+) -> tuple[list[AmenityView], str]:
+    """(편의시설 목록, source). source 는 "kakao" 또는 "seed".
+
+    lat/lng 를 주면 그 지점 주변을 검색한다. 안 주면 대전시청 기준.
+    (기준점을 고정하면 'sort=distance' 때문에 결과가 그 근처에만 몰린다.)
+    """
+    center_lat = lat if lat is not None else DAEJEON_CENTER[0]
+    center_lng = lng if lng is not None else DAEJEON_CENTER[1]
+
+    live = await _cache.get(center_lat, center_lng, radius)
     if live is not None:
         views = [v for v in live if not kind or v.kind == kind]
         return views, "kakao"
